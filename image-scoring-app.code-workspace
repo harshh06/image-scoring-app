@@ -1,0 +1,26 @@
+{
+  "folders": [
+    {
+      "path": "frontend"
+    },
+    {
+      "path": "backend"
+    }
+  ],
+  "settings": {
+    // Python interpreter settings for the backend
+    "python.pythonPath": "${workspaceFolder}/backend/.venv/bin/python",
+    "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/bin/python",
+    "[python]": {
+      "editor.defaultFormatter": "ms-python.python",
+      "editor.formatOnSave": true
+    },
+    "editor.rulers": [
+      88 // Black formatter default line length
+    ],
+    // Frontend settings (e.g., enable ESLint for JS/TS)
+    "eslint.workingDirectories": ["./frontend"],
+    // General settings
+    "editor.tabSize": 2
+  }
+}
