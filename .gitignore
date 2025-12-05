@@ -5,3 +5,29 @@ npm-debug.log*
 yarn-debug.log*
 .env
 .env.*
+
+# --- Machine Learning Data & Models ---
+
+# Ignore raw heavy images (Too big for GitHub)
+dataset/raw_images/
+
+# Ignore generated processed images (Can be recreated via script)
+dataset/processed_images/
+
+# Ignore the trained model file (Binary large object)
+backend/pancreas_model.pth
+*.pth
+
+# Ignore user uploads during development
+backend/uploads/
+
+# Virtual environments
+.venv/
+venv/
+
+# Any local datasets or exports
+dataset/
+*.tif
+*.tiff
+*.png
+*.jpg
