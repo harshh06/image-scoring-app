@@ -7,6 +7,8 @@ from PIL import Image
 from pathlib import Path
 from typing import Dict, Any
 import numpy as np
+import base64            
+from io import BytesIO   
 
 # --- CONFIGURATION ---
 # Must match training script exactly
@@ -78,9 +80,10 @@ def extract_and_process_image(file_path: Path, thumbnail_dir: Path, model: nn.Mo
             
             # Save Thumbnail
             img_thumb = img.copy()
-            img_thumb.thumbnail((800, 800))
-            thumb_filename = f"{file_path.stem}.png"
-            img_thumb.save(thumbnail_dir / thumb_filename, "PNG")
+            buffered = BytesIO()
+            img_thumb.save(buffered, format="PNG")
+            img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+            base64_url = f"data:image/png;base64,{img_str}"
             
             # Predict
             scores = predict_scores(img, model)
@@ -90,7 +93,7 @@ def extract_and_process_image(file_path: Path, thumbnail_dir: Path, model: nn.Mo
                 "filename": filename,
                 "serial_number": serial,
                 "scores": scores,
-                "display_url": f"http://localhost:8000/static/{thumb_filename}"
+                "display_url": base64_url
             }
             
     except Exception as e:

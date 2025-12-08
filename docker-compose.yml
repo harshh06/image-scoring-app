@@ -36,20 +36,19 @@ services:
     restart: unless-stopped # Always restart unless explicitly stopped
 
   frontend:
-    build: ./frontend # Path to your frontend's Dockerfile
+    build: ./frontend
     ports:
-      - "3000:3000" # Expose Next.js port to host
+      - "3000:3000"
     volumes:
-      - ./frontend:/app # Mount local frontend code for hot-reloading
-      - /app/node_modules # Explicitly exclude node_modules from host mount to prevent inconsistencies
+      - ./frontend:/app
+      # Crucial: Map node_modules externally to prevent corruption/slow build
+      - /app/node_modules
+    # 💥 FIX: Override production command with development command
+    command: npm run dev
     environment:
-      # This URL is for the frontend container to talk to the backend container
-      NEXT_PUBLIC_BACKEND_URL: http://backend:8000
-      # For local browser access from your host, you'd call http://localhost:8000.
-      # But within the Docker network, it's http://backend:8000
+      - NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
     depends_on:
-      - backend # Start backend before frontend
-    restart: unless-stopped # Always restart unless explicitly stopped
+      - backend
 
 volumes:
   db_data: # Define the named volume for PostgreSQL data

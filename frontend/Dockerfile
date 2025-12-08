@@ -1,24 +1,44 @@
-# Use an official Node.js runtime as a parent image
-FROM node:18-alpine
+# frontend/Dockerfile
 
-# Set the working directory in the container
+# ------------------------------------
+# STAGE 1: BUILD (Handles Installation and Code Compilation)
+# Purpose: To perform the slow npm install and npm run build steps.
+# ------------------------------------
+FROM node:18-alpine AS builder
 WORKDIR /app
 
-# Copy package.json and package-lock.json (or yarn.lock)
-COPY package*.json ./
+# 1. CACHING LAYER: Copy package files first. 
+# This layer only rebuilds if package.json changes (very rarely).
+COPY package.json yarn.lock* package-lock.json* ./
 
-# Install project dependencies
+# 2. Install dependencies (SLOWEST STEP - will use cache)
 RUN npm install
 
-# Copy the rest of the application code
+# 3. Copy source code (FAST STEP - changes often)
 COPY . .
 
-# Build the Next.js application for production
+# 4. Build Next.js application (Slow but necessary)
 RUN npm run build
 
-# Expose port 3000 to the network
+
+# ------------------------------------
+# STAGE 2: RUNNER (Handles Execution)
+# Purpose: To create a small, fast, production-ready image.
+# ------------------------------------
+FROM node:18-alpine AS runner
+WORKDIR /app
+# Set environment to production (important for Next.js)
+ENV NODE_ENV=production
+
+# 5. Copy ONLY the necessary built artifacts from the 'builder' stage
+# This makes the final image much smaller.
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+
 EXPOSE 3000
 
-# The default command to run when starting the container
-# This will be overridden by docker-compose.yml in development
-CMD ["npm", "run", "dev"]
+# Override the default start command for local development:
+# CMD is usually 'npm start', but docker-compose will override this to 'npm run dev'
+CMD ["npm", "start"]
