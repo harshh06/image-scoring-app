@@ -75,7 +75,7 @@ export function DashboardHeader({ results }: DashboardHeaderProps) {
           </div>
           <div>
             <h1 className="text-lg font-semibold text-foreground">
-              Scientific Data Dashboard
+              Histopathology Scoring system
             </h1>
           </div>
         </div>

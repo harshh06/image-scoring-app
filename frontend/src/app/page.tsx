@@ -9,6 +9,7 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { FileDropzone } from "@/components/file-dropzone";
 import { FileStatusList } from "@/components/file-status-list";
 import { ImagePreviewSidebar } from "@/components/image-preview-sidebar";
+import axios from "axios";
 
 // Define the shape of a queued item (Exported for use in FileStatusList)
 export interface QueueItem {
@@ -24,6 +25,7 @@ export default function DashboardPage() {
   // isProcessing acts as a global lock to ensure only one upload runs at a time
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [scoreUpdating, setScoreUpdating] = useState<boolean>(false);
 
   // Memoized lists for displaying data
   const results = useMemo(() => queue.filter((item) => item.result), [queue]);
@@ -110,6 +112,55 @@ export default function DashboardPage() {
     }
   }, [queue, isProcessing]);
 
+  const handleScoreUpdate = async (
+    itemId: string,
+    metric: string,
+    value: number
+  ) => {
+    // 1. Optimistic Update (Update UI immediately)
+    setQueue((prev) => {
+      const newQueue = [...prev];
+      const index = newQueue.findIndex((item) => item.id === itemId);
+
+      if (index === -1 || !newQueue[index].result) return prev;
+
+      const scores = newQueue[index].result!.scores;
+      // @ts-ignore
+      scores[metric] = value;
+      scores.Total =
+        scores["Pancreatic Architecture"] +
+        scores["Glandular Atrophy"] +
+        scores["Pseudotubular Complexes"] +
+        scores["Fibrosis"];
+      scores.Total = Math.round(scores.Total * 100) / 100;
+
+      return newQueue;
+    });
+
+    // 2. Background API Call to Save to DB
+    const item = queue.find((q) => q.id === itemId);
+    if (!item?.result?.db_id) return; // Can't save if we don't have a DB ID
+
+    try {
+      // Use the NEXT_PUBLIC_BACKEND_URL from env or localhost
+      const API_URL =
+        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+      setScoreUpdating(true);
+
+      await axios.put(`${API_URL}/api/scores/${item.result.db_id}`, {
+        [metric]: value,
+      });
+      console.log(`Saved ${metric} update to DB`);
+    } catch (err) {
+      console.error("Failed to save score update:", err);
+      setScoreUpdating(false);
+    } finally {
+      setTimeout(() => setScoreUpdating(false), 1000);
+      // Optional: Revert UI change here if you want strict consistency
+    }
+  };
+
   // --- 3. Trigger the Processor ---
   // Reruns whenever the queue or processing status changes
   useEffect(() => {
@@ -148,7 +199,11 @@ export default function DashboardPage() {
         </main>
 
         {/* Fixed Right Sidebar */}
-        <ImagePreviewSidebar selectedItem={selectedItem} />
+        <ImagePreviewSidebar
+          selectedItem={selectedItem}
+          onScoreUpdate={handleScoreUpdate}
+          scoreUpdating={scoreUpdating}
+        />
       </div>
     </div>
   );

@@ -8,7 +8,7 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Scientific Data Dashboard",
+  title: "Histopathology Scoring System",
   description:
     "Modern dashboard for scientific data analysis and visualization",
   generator: "v0.app",

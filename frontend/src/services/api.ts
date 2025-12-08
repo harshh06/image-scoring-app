@@ -23,6 +23,7 @@ export interface ProcessedResult {
   serial_number: string;
   scores: ScoreData;
   display_url: string; // URL to the generated thumbnail
+  db_id: number;
 }
 
 // --- API FUNCTIONS ---

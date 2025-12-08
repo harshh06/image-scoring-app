@@ -9,6 +9,7 @@ from typing import Dict, Any
 import numpy as np
 import base64            
 from io import BytesIO   
+import re
 
 # --- CONFIGURATION ---
 # Must match training script exactly
@@ -56,12 +57,14 @@ def predict_scores(image: Image.Image, model: nn.Module) -> Dict[str, float]:
     
     # Clamp to be safe (no negatives or huge numbers)
     actual_scores = np.clip(actual_scores, 0, MAX_SCORES)
-    
+    def round_quarter(num):
+        return round(num * 4) / 4
+
     scores = {
-        "Pancreatic Architecture": round(float(actual_scores[0]), 2),
-        "Glandular Atrophy": round(float(actual_scores[1]), 2),
-        "Pseudotubular Complexes": round(float(actual_scores[2]), 2),
-        "Fibrosis": round(float(actual_scores[3]), 2),
+        "Pancreatic Architecture": round_quarter(float(actual_scores[0])),
+        "Glandular Atrophy": round_quarter(float(actual_scores[1])),
+        "Pseudotubular Complexes": round_quarter(float(actual_scores[2])),
+        "Fibrosis": round_quarter(float(actual_scores[3])),
     }
     scores['Total'] = round(sum(scores.values()), 2)
     
@@ -70,8 +73,28 @@ def predict_scores(image: Image.Image, model: nn.Module) -> Dict[str, float]:
 def extract_and_process_image(file_path: Path, thumbnail_dir: Path, model: nn.Module, max_scores: np.ndarray) -> Dict[str, Any]:
     """Main pipeline."""
     filename = file_path.name
+    
+    # --- START OF NEW PARSING LOGIC ---
+    # 1. Default fallback
+    sample_id = "UNKNOWN"
+    image_suffix = "00"
+    
+    # 2. Extract Sample ID (e.g., "S-3349")
     parts = filename.split("-")
-    serial = f"{parts[0]}-{parts[1]}" if len(parts) > 1 else "UNKNOWN"
+    if len(parts) >= 2:
+        sample_id = f"{parts[0]}-{parts[1]}"
+
+    # 3. Extract Image Number (e.g., "001" from "Image001")
+    # This regex looks for "Image" followed by numbers
+    match = re.search(r"Image(\d+)", filename, re.IGNORECASE)
+    if match:
+        raw_num = match.group(1) # Gets "001"
+        # Take the last 2 digits for cleaner ID (e.g. "01")
+        image_suffix = raw_num[-2:] if len(raw_num) >= 2 else raw_num.zfill(2)
+
+    # 4. Construct Unique Serial (e.g., "S-3349-01")
+    full_serial = f"{sample_id}-{image_suffix}"
+    # --- END OF NEW PARSING LOGIC ---
 
     try:
         with Image.open(file_path) as img:
@@ -80,6 +103,12 @@ def extract_and_process_image(file_path: Path, thumbnail_dir: Path, model: nn.Mo
             
             # Save Thumbnail
             img_thumb = img.copy()
+            
+            # CRITICAL OPTIMIZATION: Resize before converting to Base64
+            # Your previous code skipped this, which would make the Base64 string HUGE (50MB+).
+            # This keeps the response fast (approx 100KB).
+            img_thumb.thumbnail((400, 400)) 
+            
             buffered = BytesIO()
             img_thumb.save(buffered, format="PNG")
             img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
@@ -91,7 +120,8 @@ def extract_and_process_image(file_path: Path, thumbnail_dir: Path, model: nn.Mo
             return {
                 "status": "success",
                 "filename": filename,
-                "serial_number": serial,
+                "serial_number": full_serial, # NEW: Unique ID (S-3602-01)
+                "sample_id": sample_id,       # NEW: Group ID (S-3602)
                 "scores": scores,
                 "display_url": base64_url
             }
