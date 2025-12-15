@@ -22,6 +22,6 @@ jobs:
         # SOURCE: The folder in your GitHub repo to copy (backend)
         # DESTINATION: The name of your Hugging Face Space
         run: |
-          git config --global user.email "your-email@example.com"
-          git config --global user.name "GitHub Actions"
+          git config --global user.email "harsh66287@gmail.com"
+          git config --global user.name "harshh06"
           git subtree push --prefix backend https://user:$HF_TOKEN@huggingface.co/spaces/harshsonii/harshsonii/histopathology-scoring main
