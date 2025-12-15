@@ -15,8 +15,8 @@ dataset/raw_images/
 dataset/processed_images/
 
 # Ignore the trained model file (Binary large object)
-backend/pancreas_model.pth
-*.pth
+# backend/pancreas_model.pth
+# *.pth
 
 # Ignore user uploads during development
 backend/uploads/
