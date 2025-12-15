@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ImageIcon, Save, Loader2, CheckCircle2 } from "lucide-react";
+import { ImageIcon, Save, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { QueueItem } from "@/app/page";
 
@@ -30,10 +30,6 @@ export function ImagePreviewSidebar({
     // Parse the number (handle empty string as 0)
     let val = parseFloat(valueStr);
     if (isNaN(val)) val = 0;
-
-    // Clamp values if you want (e.g., 0 to 4)
-    // if (val > 4) val = 4;
-    // if (val < 0) val = 0;
 
     onScoreUpdate(selectedItem.id, metricKey, val);
   };

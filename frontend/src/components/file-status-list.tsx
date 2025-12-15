@@ -5,8 +5,7 @@
 import type React from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Loader2, AlertCircle, FileText, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { CheckCircle2, Loader2, AlertCircle, FileText } from "lucide-react";
 import { QueueItem } from "@/app/page"; // Import the defined QueueItem interface
 
 // Define props for the list component

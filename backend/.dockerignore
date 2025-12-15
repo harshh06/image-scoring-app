@@ -1,0 +1,14 @@
+# backend/.dockerignore
+
+# Ignore the heavy static files (images)
+static/
+downloads/
+__pycache__/
+*.pyc
+.env
+.venv
+venv/
+.git
+.gitignore
+README.md
+uploads/

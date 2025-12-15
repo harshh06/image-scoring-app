@@ -35,7 +35,6 @@ def predict_scores(image: Image.Image, model: nn.Module) -> Dict[str, float]:
     """Inference Logic."""
     
     # 1. Force Resize to 512x512 (Match Training Preprocessing)
-    # This prevents the "Zoomed In" bug.
     image = image.resize((512, 512))
     
     # 2. Transform for PyTorch
@@ -70,43 +69,38 @@ def predict_scores(image: Image.Image, model: nn.Module) -> Dict[str, float]:
     
     return scores
 
-def extract_and_process_image(file_path: Path, thumbnail_dir: Path, model: nn.Module, max_scores: np.ndarray) -> Dict[str, Any]:
-    """Main pipeline."""
-    filename = file_path.name
+def extract_and_process_image(
+    file_stream: bytes,          # <--- CHANGED: Accepts raw bytes now
+    filename: str,               # <--- CHANGED: Accepts filename string
+    model: nn.Module, 
+    max_scores: np.ndarray
+) -> Dict[str, Any]:
+    """Main pipeline - In-Memory Version"""
     
-    # --- START OF NEW PARSING LOGIC ---
-    # 1. Default fallback
+    # --- PARSING LOGIC ---
     sample_id = "UNKNOWN"
     image_suffix = "00"
     
-    # 2. Extract Sample ID (e.g., "S-3349")
     parts = filename.split("-")
     if len(parts) >= 2:
         sample_id = f"{parts[0]}-{parts[1]}"
 
-    # 3. Extract Image Number (e.g., "001" from "Image001")
-    # This regex looks for "Image" followed by numbers
     match = re.search(r"Image(\d+)", filename, re.IGNORECASE)
     if match:
-        raw_num = match.group(1) # Gets "001"
-        # Take the last 2 digits for cleaner ID (e.g. "01")
+        raw_num = match.group(1)
         image_suffix = raw_num[-2:] if len(raw_num) >= 2 else raw_num.zfill(2)
 
-    # 4. Construct Unique Serial (e.g., "S-3349-01")
     full_serial = f"{sample_id}-{image_suffix}"
-    # --- END OF NEW PARSING LOGIC ---
 
     try:
-        with Image.open(file_path) as img:
+        # --- OPEN IMAGE FROM RAM ---
+        # Wrap bytes in BytesIO so PIL thinks it's a file
+        with Image.open(BytesIO(file_stream)) as img:
             if img.mode != 'RGB':
                 img = img.convert('RGB')
             
-            # Save Thumbnail
+            # Create Thumbnail (In Memory)
             img_thumb = img.copy()
-            
-            # CRITICAL OPTIMIZATION: Resize before converting to Base64
-            # Your previous code skipped this, which would make the Base64 string HUGE (50MB+).
-            # This keeps the response fast (approx 100KB).
             img_thumb.thumbnail((400, 400)) 
             
             buffered = BytesIO()
@@ -120,8 +114,8 @@ def extract_and_process_image(file_path: Path, thumbnail_dir: Path, model: nn.Mo
             return {
                 "status": "success",
                 "filename": filename,
-                "serial_number": full_serial, # NEW: Unique ID (S-3602-01)
-                "sample_id": sample_id,       # NEW: Group ID (S-3602)
+                "serial_number": full_serial,
+                "sample_id": sample_id,
                 "scores": scores,
                 "display_url": base64_url
             }

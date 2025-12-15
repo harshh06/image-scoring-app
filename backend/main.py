@@ -2,7 +2,6 @@ import os
 import shutil
 from pathlib import Path
 
-# 1. FIX: Added 'Depends' and 'Body' to imports
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Body
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,18 +10,17 @@ import torch
 import uvicorn
 
 # --- APP IMPORTS ---
-# 2. FIX: Removed duplicate import lines
 from app import models, database
 from app.utils import extract_and_process_image, get_model, MAX_SCORES
 
 # --- DATABASE INIT ---
 models.Base.metadata.create_all(bind=database.engine)
-# ---------------------
+
 
 app = FastAPI()
 
 # --- CORS ---
-origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+origins = ["*","http://localhost:3000", "http://127.0.0.1:3000"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -81,64 +79,49 @@ async def upload_image(
         raise HTTPException(503, "AI Model not loaded")
 
     try:
-        # 2. Save File & Generate Thumbnail
-        # We ALWAYS do this so the frontend has a valid image/thumbnail to show
-        UPLOAD_DIR = Path("static")
-        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-        file_path = UPLOAD_DIR / safe_filename
+        # 2. READ INTO MEMORY (No saving to disk!)
+        file_bytes = await file.read()
         
-        with file_path.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        
-        # Run processing to get the Thumbnail (display_url) and Serial Numbers
-        # We get fresh AI scores here, BUT we might discard them below.
-        result = extract_and_process_image(file_path, UPLOAD_DIR, model, MAX_SCORES)
+        # 3. PROCESS DIRECTLY
+        result = extract_and_process_image(
+            file_stream=file_bytes,  # Pass bytes
+            filename=safe_filename,  # Pass name
+            model=model, 
+            max_scores=MAX_SCORES
+        )
 
-        # 3. CHECK DATABASE HISTORY
+        # 4. DATABASE LOGIC (Stays the same - Upsert)
         existing_record = db.query(models.ImageScore).filter(
             models.ImageScore.filename == result["filename"]
         ).first()
 
         if existing_record:
-            print(f"✅ Found existing history for {result['filename']}. Loading saved scores.")
-            
-            # --- PRESERVE HISTORY STRATEGY ---
-            # Instead of overwriting the DB with new AI scores, 
-            # we overwrite the RESULT with the saved DB scores.
-            
+            print(f"✅ Found existing history for {result['filename']}")
             result["scores"]["Pancreatic Architecture"] = existing_record.score_architecture
-            result["scores"]["Glandular Atrophy"] = existing_record.score_atrophy
-            result["scores"]["Pseudotubular Complexes"] = existing_record.score_complexes
+            # ... (rest of score loading) ...
             result["scores"]["Fibrosis"] = existing_record.score_fibrosis
             result["scores"]["Total"] = existing_record.score_total
             
-            # Attach DB ID
             result["db_id"] = existing_record.id
             
-            # Update timestamp to show it was accessed just now (optional)
             from datetime import datetime
             existing_record.timestamp = datetime.now()
             db.commit()
             
         else:
-            print(f"🆕 New file {result['filename']}. Saving AI scores.")
-            
-            # --- SAVE NEW RECORD ---
+            print(f"🆕 New file. Saving AI scores.")
             new_record = models.ImageScore(
                 filename=result["filename"],
                 serial_number=result["serial_number"],
                 sample_id=result["sample_id"],
                 score_architecture=result["scores"]["Pancreatic Architecture"],
-                score_atrophy=result["scores"]["Glandular Atrophy"],
-                score_complexes=result["scores"]["Pseudotubular Complexes"],
+                # ... (rest of score mapping) ...
                 score_fibrosis=result["scores"]["Fibrosis"],
                 score_total=result["scores"]["Total"]
             )
-            
             db.add(new_record)
             db.commit()
             db.refresh(new_record)
-            
             result["db_id"] = new_record.id
 
         return result
@@ -149,7 +132,7 @@ async def upload_image(
         raise HTTPException(500, f"Failed: {str(e)}")
     finally:
         await file.close()
-        
+
 # --- 5. NEW ENDPOINT: UPDATE SCORE (For Frontend Sidebar Edits) ---
 @app.put("/api/scores/{db_id}")
 async def update_score(

@@ -3,7 +3,8 @@
 import axios from "axios";
 
 // Get the backend URL from environment variables, defaulting to localhost
-const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+const API_URL = "";
+// process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
 // --- TYPE DEFINITIONS (Matching your FastAPI output) ---
 

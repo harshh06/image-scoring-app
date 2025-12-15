@@ -143,8 +143,8 @@ export default function DashboardPage() {
 
     try {
       // Use the NEXT_PUBLIC_BACKEND_URL from env or localhost
-      const API_URL =
-        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+      const API_URL = "";
+      // process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
       setScoreUpdating(true);
 

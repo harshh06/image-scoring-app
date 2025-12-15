@@ -3,14 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   eslint: {
-    // Warning: This allows production builds to successfully complete even if
-    // your project has ESLint errors.
     ignoreDuringBuilds: true,
   },
   typescript: {
-    // !! WARN !!
-    // Dangerously allow production builds to successfully complete even if
-    // your project has type errors.
     ignoreBuildErrors: true,
   },
   images: {
@@ -19,9 +14,20 @@ const nextConfig: NextConfig = {
         protocol: "http",
         hostname: "localhost",
         port: "8000",
-        pathname: "/static/**", // Allows access to any file inside the /static/ path
+        pathname: "/static/**",
       },
     ],
+  },
+  // --- ADD THIS SECTION BELOW ---
+  async rewrites() {
+    const backendUrl = process.env.BACKEND_URL || "http://backend:8000";
+    return [
+      {
+        source: "/api/:path*",
+        // 'backend' is the name of your service in docker-compose.yml
+        destination: `${backendUrl}/api/:path*`,
+      },
+    ];
   },
 };
 
