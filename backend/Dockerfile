@@ -24,4 +24,4 @@ COPY . .
 
 # Instead of running "python main.py", we run uvicorn directly.
 # This gives you standard control over reload, workers, and ports.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
