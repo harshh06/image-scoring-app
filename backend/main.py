@@ -51,7 +51,7 @@ async def load_model():
         # Define architecture
         model = get_model()
         # Load weights
-        model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device('cpu')))
+        model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device('cpu'), weights_only=False))
         model.eval() # Set to evaluation mode
         print(f"--- SUCCESS: Loaded AI Model from {MODEL_PATH} ---")
     except FileNotFoundError:
