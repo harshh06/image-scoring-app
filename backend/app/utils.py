@@ -39,7 +39,7 @@ def predict_scores(image: Image.Image, model: nn.Module) -> Dict[str, float]:
     
     # 2. Transform for PyTorch
     input_tensor = MODEL_TRANSFORMS(image)
-    input_batch = input_tensor.unsqueeze(0) #Add batch dimension
+    input_batch = input_tensor.unsqueeze(0) # Add batch dimension
     
     device = torch.device("cpu")
     
