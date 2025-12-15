@@ -24,4 +24,10 @@ jobs:
         run: |
           git config --global user.email "harsh66287@gmail.com"
           git config --global user.name "harshh06"
-          git subtree push --prefix backend https://user:$HF_TOKEN@huggingface.co/spaces/harshsonii/histopathology-scoring main
+          # 1. Create a temporary 'split' of just the backend folder
+          # This calculates the git history for ONLY the backend folder
+          SPLIT_HASH=$(git subtree split --prefix backend)
+
+          # 2. Force push that specific history to Hugging Face
+          # --force is the key here! It overwrites the history mismatch.
+          git push --force https://harshsonii:$HF_TOKEN@huggingface.co/spaces/harshsonii/histopathology-scoring $SPLIT_HASH:main
