@@ -1,0 +1,27 @@
+name: Sync Backend to Hugging Face Hub
+
+on:
+  push:
+    branches: [main]
+    # This filter ensures the action ONLY runs when you change backend files
+    paths:
+      - "backend/**"
+
+jobs:
+  sync-to-hub:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Push to Hub
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        # SOURCE: The folder in your GitHub repo to copy (backend)
+        # DESTINATION: The name of your Hugging Face Space
+        run: |
+          git config --global user.email "your-email@example.com"
+          git config --global user.name "GitHub Actions"
+          git subtree push --prefix backend https://user:$HF_TOKEN@huggingface.co/spaces/harshsonii/harshsonii/histopathology-scoring main
