@@ -4,7 +4,7 @@
 # STAGE 1: BUILD (Handles Installation and Code Compilation)
 # Purpose: To perform the slow npm install and npm run build steps.
 # ------------------------------------
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 
 # 1. CACHING LAYER: Copy package files first. 
