@@ -3,8 +3,7 @@
 import axios from "axios";
 
 // Get the backend URL from environment variables, defaulting to localhost
-const API_URL = "";
-// process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // --- TYPE DEFINITIONS (Matching your FastAPI output) ---
 
@@ -42,7 +41,7 @@ export const uploadImage = async (file: File): Promise<ProcessedResult> => {
   console.log(`[API] Starting upload for: ${file.name}: ${API_URL}`);
 
   // We use Axios to handle the POST request
-  const response = await axios.post(`${API_URL}/api/upload-image/`, formData, {
+  const response = await axios.post(`${API_URL}/api/upload-image`, formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
