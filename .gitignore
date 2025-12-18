@@ -29,5 +29,4 @@ venv/
 dataset/
 *.tif
 *.tiff
-*.png
 *.jpg
