@@ -3,6 +3,7 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime
 from sqlalchemy.sql import func
 from .database import Base  # Import Base from your database.py, don't create a new one!
+from sqlalchemy.orm import Mapped, mapped_column
 
 class ImageScore(Base):
     __tablename__ = "image_scores"
@@ -11,7 +12,7 @@ class ImageScore(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     # File Metadata
-    filename = Column(String, index=True)      # e.g., "S-3602-10X_Image001.tif"
+    filename =  Column(String, unique=True, nullable=False, index=True)      # e.g., "S-3602-10X_Image001.tif"
     serial_number = Column(String, index=True) # e.g., "S-3602-01" (Unique ID)
     sample_id = Column(String, index=True)     # e.g., "S-3602"    (Group ID)
 
@@ -27,7 +28,7 @@ class ImageScore(Base):
     score_fibrosis = Column(Float)
     
     # Total Score
-    score_total = Column(Float)
+    score_total: Mapped[float] = mapped_column(Float)
 
     def __repr__(self):
         return f"<ImageScore(id={self.id}, serial='{self.serial_number}', total={self.score_total})>"

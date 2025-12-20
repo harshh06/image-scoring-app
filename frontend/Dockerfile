@@ -25,7 +25,7 @@ RUN npm run build
 # STAGE 2: RUNNER (Handles Execution)
 # Purpose: To create a small, fast, production-ready image.
 # ------------------------------------
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 # Set environment to production (important for Next.js)
 ENV NODE_ENV=production

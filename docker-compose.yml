@@ -1,39 +1,15 @@
 # image-scoring-app/docker-compose.yml
-version: "3.8"
 
 services:
-  db:
-    image: postgres:15-alpine
-    ports:
-      - "5432:5432" # Expose DB port to host for direct access if needed
-    environment:
-      POSTGRES_DB: image_scoring_db
-      POSTGRES_USER: appuser
-      POSTGRES_PASSWORD: your_strong_dev_password
-    volumes:
-      - db_data:/var/lib/postgresql/data # Persistent volume for DB data
-    healthcheck: # Ensure DB is ready before other services try to connect
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped # Always restart unless explicitly stopped
-
   backend:
-    build: ./backend # Path to your backend's Dockerfile
+    build: ./backend
     ports:
-      - "8000:8000" # Expose FastAPI port to host
+      - "8000:7860" # Maps Host 8000 -> Container 7860 (Correct)
     volumes:
-      - ./backend:/app # Mount local backend code for hot-reloading
-    environment:
-      # Use the 'db' service name for the hostname, as Docker Compose creates a network
-      # where services can resolve each other by name.
-      # Make sure credentials match the 'db' service's environment
-      DATABASE_URL: postgresql+psycopg2://appuser:your_strong_dev_password@db:5432/image_scoring_db
-    depends_on:
-      db:
-        condition: service_healthy # Wait for DB to be healthy
-    restart: unless-stopped # Always restart unless explicitly stopped
+      - ./backend:/app
+    env_file:
+      - ./backend/.env # Loads ALLOWED_ORIGINS and DATABASE_URL (Supabase)
+    restart: unless-stopped
 
   frontend:
     build: ./frontend
@@ -41,14 +17,9 @@ services:
       - "3000:3000"
     volumes:
       - ./frontend:/app
-      # Crucial: Map node_modules externally to prevent corruption/slow build
       - /app/node_modules
-    # 💥 FIX: Override production command with development command
     command: npm run dev
     environment:
       - NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
     depends_on:
       - backend
-
-volumes:
-  db_data: # Define the named volume for PostgreSQL data

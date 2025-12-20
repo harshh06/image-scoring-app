@@ -14,3 +14,9 @@ pillow>=11.3.0          # Image loading & resizing
 sqlalchemy>=2.0.43      # ORM
 psycopg2-binary>=2.9.9  # Postgres Adapter
 pydantic>=2.11.10       # Data Validation
+
+# --- Testing
+pytest 
+pytest-cov 
+pytest-asyncio 
+httpx

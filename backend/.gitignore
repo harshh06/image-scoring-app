@@ -3,3 +3,15 @@ __pycache__/
 .venv/
 *.pyc
 .env
+
+# --- Testing & Coverage ---
+.pytest_cache/
+.coverage
+htmlcov/
+nosetests.xml
+coverage.xml
+*.cover
+.anyio_cache/
+
+*.db
+*.sqlite3
