@@ -1,27 +1,39 @@
 // frontend/src/components/dashboard-header.tsx
 
 import { Button } from "@/components/ui/button";
-import { Download, Database, CheckCircle2 } from "lucide-react";
-import { ProcessedResult } from "@/services/api";
+import { Download, Database, CheckCircle2, Upload, History } from "lucide-react";
 
-interface Result {
-  file: string;
-  id: string;
-  status: string;
-  result: ProcessedResult;
+// Unified export data format for both upload and history tabs
+export interface ExportDataItem {
+  filename: string;
+  serial_number: string;
+  sample_id: string;
+  score_architecture: number;
+  score_atrophy: number;
+  score_complexes: number;
+  score_fibrosis: number;
+  score_total: number;
 }
+
+export type TabType = "upload" | "history";
 
 interface DashboardHeaderProps {
-  results: Result[];
+  exportData: ExportDataItem[];
+  activeTab: TabType;
+  onTabChange: (tab: TabType) => void;
 }
 
-export function DashboardHeader({ results }: DashboardHeaderProps) {
+export function DashboardHeader({
+  exportData,
+  activeTab,
+  onTabChange,
+}: DashboardHeaderProps) {
   const handleExport = () => {
-    if (results.length === 0) return;
+    if (exportData.length === 0) return;
 
     // 1. Define CSV Headers
     const headers = [
-      "Filename",
+      "Sample ID",
       "Serial Number",
       "Pancreatic Architecture",
       "Glandular Atrophy",
@@ -31,18 +43,16 @@ export function DashboardHeader({ results }: DashboardHeaderProps) {
     ];
 
     // 2. Convert Data to CSV Rows
-    const rows = results.map((r: Result) => {
-      const result = r.result;
-      return [
-        result.filename,
-        result.serial_number,
-        result.scores["Pancreatic Architecture"],
-        result.scores["Glandular Atrophy"],
-        result.scores["Pseudotubular Complexes"],
-        result.scores["Fibrosis"],
-        result.scores.Total,
-      ];
-    });
+    const rows = exportData.map((item) => [
+      item.sample_id,
+      // item.filename,
+      item.serial_number,
+      item.score_architecture,
+      item.score_atrophy,
+      item.score_complexes,
+      item.score_fibrosis,
+      item.score_total,
+    ]);
 
     // 3. Join with commas and newlines
     const csvContent = [
@@ -64,20 +74,53 @@ export function DashboardHeader({ results }: DashboardHeaderProps) {
     document.body.removeChild(link);
   };
 
-  const completedCount = results.length;
+  const completedCount = exportData.length;
 
   return (
     <header className="border-b border-border bg-card">
       <div className="flex h-16 items-center justify-between px-6 lg:px-8">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <Database className="h-5 w-5 text-primary-foreground" />
+        <div className="flex items-center gap-6">
+          {/* Logo and Title */}
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+              <Database className="h-5 w-5 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-foreground">
+                Histopathology Scoring system
+              </h1>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-semibold text-foreground">
-              Histopathology Scoring system
-            </h1>
-          </div>
+
+          {/* Tab Navigation */}
+          <nav className="flex items-center gap-1 ml-8">
+            <Button
+              variant={activeTab === "upload" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => onTabChange("upload")}
+              className={`gap-2 transition-all duration-200 ${
+                activeTab === "upload"
+                  ? "shadow-md"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Upload className="h-4 w-4" />
+              Upload
+            </Button>
+            <Button
+              variant={activeTab === "history" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => onTabChange("history")}
+              className={`gap-2 transition-all duration-200 ${
+                activeTab === "history"
+                  ? "shadow-md"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <History className="h-4 w-4" />
+              History
+            </Button>
+          </nav>
         </div>
 
         <div className="flex items-center gap-4">

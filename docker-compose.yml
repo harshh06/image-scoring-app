@@ -7,6 +7,7 @@ services:
       - "8000:7860" # Maps Host 8000 -> Container 7860 (Correct)
     volumes:
       - ./backend:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 7860 --reload
     env_file:
       - ./backend/.env # Loads ALLOWED_ORIGINS and DATABASE_URL (Supabase)
     restart: unless-stopped

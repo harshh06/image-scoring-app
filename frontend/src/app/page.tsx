@@ -2,13 +2,15 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-// Import the API service function
-import { uploadImage, ProcessedResult } from "@/services/api";
+// Import the API service functions
+import { uploadImage, ProcessedResult, HistoryItem, GroupedHistory, fetchHistory, groupAndSortHistory } from "@/services/api";
 // Import components
-import { DashboardHeader } from "@/components/dashboard-header";
+import { DashboardHeader, TabType } from "@/components/dashboard-header";
 import { FileDropzone } from "@/components/file-dropzone";
 import { FileStatusList } from "@/components/file-status-list";
 import { ImagePreviewSidebar } from "@/components/image-preview-sidebar";
+import { HistoryList } from "@/components/history-list";
+import { HistoryPreviewSidebar } from "@/components/history-preview-sidebar";
 import axios from "axios";
 
 // Define the shape of a queued item (Exported for use in FileStatusList)
@@ -27,12 +29,65 @@ export default function DashboardPage() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [scoreUpdating, setScoreUpdating] = useState<boolean>(false);
 
+  // Tab management
+  const [activeTab, setActiveTab] = useState<TabType>("upload");
+
+  // History state
+  const [selectedHistoryItem, setSelectedHistoryItem] =
+    useState<HistoryItem | null>(null);
+  const [historyScoreUpdating, setHistoryScoreUpdating] =
+    useState<boolean>(false);
+
+  
+  const [groupedHistory, setGroupedHistory] = useState<GroupedHistory>({});
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   // Memoized lists for displaying data
   const results = useMemo(() => queue.filter((item) => item.result), [queue]);
   const selectedItem = useMemo(
     () => queue.find((item) => item.id === selectedItemId),
     [queue, selectedItemId]
   );
+
+  // Compute export data based on active tab
+  const exportData = useMemo(() => {
+    if (activeTab === "upload") {
+      // For upload tab, return processed results in compatible format
+      return results
+        .filter((r) => r.result)
+        .map((r) => ({
+          filename: r.result!.filename,
+          serial_number: r.result!.serial_number,
+          sample_id: r.result!.sample_id || "Unknown",
+          score_architecture: r.result!.scores["Pancreatic Architecture"],
+          score_atrophy: r.result!.scores["Glandular Atrophy"],
+          score_complexes: r.result!.scores["Pseudotubular Complexes"],
+          score_fibrosis: r.result!.scores["Fibrosis"],
+          score_total: r.result!.scores.Total,
+        }));
+    } else {
+      // For history tab, return items from selected groups
+      const selectedItems: HistoryItem[] = [];
+      selectedGroups.forEach((sampleId) => {
+        if (groupedHistory[sampleId]) {
+          selectedItems.push(...groupedHistory[sampleId]);
+        }
+      });
+      return selectedItems.map((item) => ({
+        filename: item.filename,
+        serial_number: item.serial_number,
+        sample_id: item.sample_id,
+        score_architecture: item.score_architecture,
+        score_atrophy: item.score_atrophy,
+        score_complexes: item.score_complexes,
+        score_fibrosis: item.score_fibrosis,
+        score_total: item.score_total,
+      }));
+    }
+  }, [activeTab, results, selectedGroups, groupedHistory]);
 
   // --- 1. Handle File Selection: Add files to the queue ---
   const handleFileSelect = (fileList: FileList) => {
@@ -161,6 +216,85 @@ export default function DashboardPage() {
     }
   };
 
+  // --- History Score Update Handler ---
+  const handleHistoryScoreUpdate = async (
+    itemId: number,
+    metric: string,
+    value: number
+  ) => {
+    if (!selectedHistoryItem) return;
+
+    // 1. Optimistic Update (Update UI immediately)
+    const updatedItem = { ...selectedHistoryItem };
+    
+    // Map metric names to database fields
+    const metricToField: { [key: string]: keyof HistoryItem } = {
+      "Pancreatic Architecture": "score_architecture",
+      "Glandular Atrophy": "score_atrophy",
+      "Pseudotubular Complexes": "score_complexes",
+      Fibrosis: "score_fibrosis",
+    };
+
+    const field = metricToField[metric];
+    if (field) {
+      // @ts-ignore - we know these are number fields
+      updatedItem[field] = value;
+      // Recalculate total
+      updatedItem.score_total =
+        (updatedItem.score_architecture ?? 0) +
+        (updatedItem.score_atrophy ?? 0) +
+        (updatedItem.score_complexes ?? 0) +
+        (updatedItem.score_fibrosis ?? 0);
+      updatedItem.score_total =
+        Math.round(updatedItem.score_total * 100) / 100;
+    }
+
+    setSelectedHistoryItem(updatedItem);
+
+    // 2. Background API Call to Save to DB
+    try {
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+      setHistoryScoreUpdating(true);
+
+      await axios.put(`${API_URL}/api/scores/${itemId}`, {
+        [metric]: value,
+      });
+      console.log(`Saved ${metric} update for history item ${itemId} to DB`);
+    } catch (err) {
+      console.error("Failed to save score update:", err);
+      setHistoryScoreUpdating(false);
+    } finally {
+      setTimeout(() => setHistoryScoreUpdating(false), 1000);
+    }
+  };
+
+  // --- Handle History Item Selection ---
+  const handleHistoryItemSelect = (item: HistoryItem) => {
+    setSelectedHistoryItem(item);
+  };
+
+  // Fetch history data on mount
+  const loadHistory = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchHistory();
+      const grouped = groupAndSortHistory(data);
+      setGroupedHistory(grouped);
+      // Expand all groups by default
+      setExpandedGroups(new Set(Object.keys(grouped)));
+    } catch (err) {
+      console.error("Failed to fetch history:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to load history data"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // --- 3. Trigger the Processor ---
   // Reruns whenever the queue or processing status changes
   useEffect(() => {
@@ -172,38 +306,82 @@ export default function DashboardPage() {
     return () => clearTimeout(timer); // Cleanup timer if component unmounts
   }, [queue, isProcessing, processQueue]);
 
+  // Clear selection and reset state when switching tabs
+  useEffect(() => {
+    if (activeTab === "upload") {
+      setSelectedHistoryItem(null);
+      // Clear history selections when switching to upload
+      setSelectedGroups(new Set());
+    } else {
+      loadHistory();
+      setSelectedItemId(null);
+      // Clear selected groups when switching to history (start fresh)
+      setSelectedGroups(new Set());
+    }
+  }, [activeTab]);
+
   return (
     <div className="flex h-screen flex-col bg-background">
-      {/* Pass results for the export button to access the data */}
-      <DashboardHeader results={results} />
+      {/* Pass exportData for the export button to access the data */}
+      <DashboardHeader
+        exportData={exportData}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto">
           <div className="container mx-auto p-6 lg:p-8">
             <div className="space-y-6">
-              {/* Dropzone receives the file handler and disabled state */}
-              <FileDropzone
-                onFilesAccepted={handleFileSelect}
-                disabled={isProcessing}
-              />
-
-              {/* Status List receives the queue state */}
-              <FileStatusList
-                queue={queue}
-                onItemSelected={setSelectedItemId}
-                selectedItemId={selectedItemId}
-              />
+              {activeTab === "upload" ? (
+                <>
+                  {/* Upload Tab Content */}
+                  <FileDropzone
+                    onFilesAccepted={handleFileSelect}
+                    disabled={isProcessing}
+                  />
+                  <FileStatusList
+                    queue={queue}
+                    onItemSelected={setSelectedItemId}
+                    selectedItemId={selectedItemId}
+                  />
+                </>
+              ) : (
+                <>
+                  {/* History Tab Content */}
+                  <HistoryList
+                    onItemSelected={handleHistoryItemSelect}
+                    selectedItemId={selectedHistoryItem?.id ?? null}
+                    groupedHistory={groupedHistory}
+                    expandedGroups={expandedGroups}
+                    setExpandedGroups={setExpandedGroups}
+                    selectedGroups={selectedGroups}
+                    setSelectedGroups={setSelectedGroups}
+                    loading={loading}
+                    error={error}
+                    loadHistory={loadHistory}
+                  />
+                </>
+              )}
             </div>
           </div>
         </main>
 
-        {/* Fixed Right Sidebar */}
-        <ImagePreviewSidebar
-          selectedItem={selectedItem}
-          onScoreUpdate={handleScoreUpdate}
-          scoreUpdating={scoreUpdating}
-        />
+        {/* Fixed Right Sidebar - switches based on active tab */}
+        {activeTab === "upload" ? (
+          <ImagePreviewSidebar
+            selectedItem={selectedItem}
+            onScoreUpdate={handleScoreUpdate}
+            scoreUpdating={scoreUpdating}
+          />
+        ) : (
+          <HistoryPreviewSidebar
+            selectedItem={selectedHistoryItem}
+            onScoreUpdate={handleHistoryScoreUpdate}
+            scoreUpdating={historyScoreUpdating}
+          />
+        )}
       </div>
     </div>
   );

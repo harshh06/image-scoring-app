@@ -215,6 +215,36 @@ async def upload_image(
     finally:
         await file.close()
 
+@app.get("/api/scores")
+async def get_all_scores(
+    request: Request,
+    db: Session = Depends(database.get_db)
+):
+    """Fetch all scored images for history display."""
+    try:
+        records = db.query(models.ImageScore).all()
+        
+        result = []
+        for record in records:
+            result.append({
+                "id": record.id,
+                "filename": record.filename,
+                "serial_number": record.serial_number,
+                "sample_id": record.sample_id,
+                "created_at": record.created_at.isoformat() if record.created_at else None,
+                "updated_at": record.updated_at.isoformat() if record.updated_at else None,
+                "score_architecture": record.score_architecture,
+                "score_atrophy": record.score_atrophy,
+                "score_complexes": record.score_complexes,
+                "score_fibrosis": record.score_fibrosis,
+                "score_total": record.score_total
+            })
+        
+        return result
+    except Exception as e:
+        logger.error(f"Failed to fetch scores: {e}", exc_info=True)
+        raise HTTPException(500, "Failed to fetch score history")
+
 @app.put("/api/scores/{db_id}")
 async def update_score(
     db_id: int, 
