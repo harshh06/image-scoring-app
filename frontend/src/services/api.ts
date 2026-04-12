@@ -62,7 +62,7 @@ export const uploadImage = async (file: File): Promise<ProcessedResult> => {
   console.log(`[API] Starting upload for: ${file.name}: ${API_URL}`);
 
   // We use Axios to handle the POST request
-  const response = await axios.post(`${API_URL}/api/upload-image`, formData, {
+  const response = await axios.post(`${API_URL}/api/upload-image/`, formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
