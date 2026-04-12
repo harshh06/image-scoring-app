@@ -102,7 +102,7 @@ async def health_check(request: Request, db: Session = Depends(database.get_db))
         logger.error(f"Health check failed: {e}")
         raise HTTPException(503, f"Unhealthy: {str(e)}")
 
-@app.post("/api/upload-image/")
+@app.post("/api/upload-image")
 async def upload_image(
     request: Request,  
     file: UploadFile = File(...),
