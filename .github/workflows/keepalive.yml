@@ -1,0 +1,29 @@
+name: Keepalive
+
+on:
+  schedule:
+    - cron: '0 8 * * *' # Runs every day at 8:00 AM UTC
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ping Hugging Face Space
+        run: |
+          curl -L -s -o /dev/null -w "%{http_code}" https://harshsonii-histopathology-scoring.hf.space
+          echo -e "\nHugging Face Space pinged successfully"
+
+      - name: Ping Supabase Database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL secret is not set. Please add it to your GitHub repository secrets."
+            exit 1
+          fi
+          
+          # Ping Supabase to prevent the free tier project from pausing
+          psql "$DATABASE_URL" -c "SELECT 1;"
+          echo "Supabase database pinged successfully"
