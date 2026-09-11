@@ -6,6 +6,11 @@ yarn-debug.log*
 .env
 .env.*
 
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+
 # --- Machine Learning Data & Models ---
 
 # Ignore raw heavy images (Too big for GitHub)
