@@ -8,9 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Save, Loader2, Calendar, Hash, FileText } from "lucide-react";
 import { HistoryItem } from "@/services/api";
+import { ScoringMode } from "./dashboard-header";
 
 interface HistoryPreviewSidebarProps {
   selectedItem: HistoryItem | null;
+  scoringMode: ScoringMode;
   onScoreUpdate: (
     itemId: number,
     metric: string,
@@ -19,19 +21,30 @@ interface HistoryPreviewSidebarProps {
   scoreUpdating: boolean;
 }
 
-// Map from display keys to database field keys
-const metricDisplayMap: { display: string; dbField: string }[] = [
-  { display: "Pancreatic Architecture", dbField: "score_architecture" },
-  { display: "Glandular Atrophy", dbField: "score_atrophy" },
-  { display: "Pseudotubular Complexes", dbField: "score_complexes" },
-  { display: "Fibrosis", dbField: "score_fibrosis" },
-];
+// Generate dynamic mapping based on mode
+const getMetricDisplayMap = (mode: ScoringMode): { display: string; dbField: string }[] => {
+  if (mode === "ap") {
+    return [
+      { display: "Edema", dbField: "score_edema" },
+      { display: "Necrosis", dbField: "score_necrosis" },
+      { display: "Inflammation", dbField: "score_inflammation" },
+    ];
+  }
+  return [
+    { display: "Pancreatic Architecture", dbField: "score_architecture" },
+    { display: "Glandular Atrophy", dbField: "score_atrophy" },
+    { display: "Pseudotubular Complexes", dbField: "score_complexes" },
+    { display: "Fibrosis", dbField: "score_fibrosis" },
+  ];
+};
 
 export function HistoryPreviewSidebar({
   selectedItem,
+  scoringMode,
   onScoreUpdate,
   scoreUpdating,
 }: HistoryPreviewSidebarProps) {
+  const metricDisplayMap = getMetricDisplayMap(scoringMode);
   // Helper to get score value from history item
   const getScoreValue = (dbField: string): number => {
     if (!selectedItem) return 0;
@@ -44,6 +57,12 @@ export function HistoryPreviewSidebar({
         return selectedItem.score_complexes ?? 0;
       case "score_fibrosis":
         return selectedItem.score_fibrosis ?? 0;
+      case "score_edema":
+        return selectedItem.score_edema ?? 0;
+      case "score_necrosis":
+        return selectedItem.score_necrosis ?? 0;
+      case "score_inflammation":
+        return selectedItem.score_inflammation ?? 0;
       default:
         return 0;
     }
@@ -58,7 +77,11 @@ export function HistoryPreviewSidebar({
     if (isNaN(val)) val = 0;
 
     // Map database field to API field name
-    const apiFieldMap: { [key: string]: string } = {
+    const apiFieldMap: { [key: string]: string } = scoringMode === "ap" ? {
+      score_edema: "Edema",
+      score_necrosis: "Necrosis",
+      score_inflammation: "Inflammation",
+    } : {
       score_architecture: "Pancreatic Architecture",
       score_atrophy: "Glandular Atrophy",
       score_complexes: "Pseudotubular Complexes",

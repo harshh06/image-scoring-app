@@ -28,11 +28,11 @@ PLOT_SAVE_PATH = ROOT_DIR / "loss_curves.png"
 BATCH_SIZE = 8
 NUM_EPOCHS = 35
 LEARNING_RATE = 0.0001
-NUM_CLASSES = 4 # The 4 scores
+NUM_CLASSES = 3 # Edema, Necrosis, Inflammation
 
-# Max scores for normalization (Architecture, Atrophy, Complexes, Fibrosis)
+# Max scores for normalization (Edema, Necrosis, Inflammation)
 # We normalize targets to 0-1 range for better training stability
-MAX_SCORES = np.array([4.0, 3.0, 3.0, 4.0], dtype=np.float32)
+MAX_SCORES = np.array([4.0, 4.0, 4.0], dtype=np.float32)
 
 # --- 2. Custom Dataset Loader ---
 class HistologyDataset(Dataset):
@@ -87,9 +87,15 @@ def get_model():
     for param in model.layer3.parameters():
         param.requires_grad = True
 
-    # 3. Replace the Head (Classification) with Regression (4 numbers)
+    # 3. Replace the Head (Classification) with Regression (3 numbers)
+    # Dropout(p=0.5) randomly turns off 50% of neurons each training batch,
+    # forcing the model to learn general patterns instead of memorizing.
+    # It is automatically disabled during model.eval() (validation/test).
     num_ftrs = model.fc.in_features
-    model.fc = nn.Linear(num_ftrs, NUM_CLASSES)
+    model.fc = nn.Sequential(
+        nn.Dropout(p=0.5),
+        nn.Linear(num_ftrs, NUM_CLASSES)
+    )
     
     return model
 
@@ -125,7 +131,7 @@ def train_model():
     # =========================================================
     # STEP 2: LOAD AND SPLIT THE DATA (Train / Val / Test)
     # =========================================================
-    # Read the CSV that has columns: [filename, architecture, atrophy, complexes, fibrosis]
+    # Read the CSV that has columns: [filename, edema, necrosis, inflammation, total]
     df = pd.read_csv(LABEL_FILE)
 
     # 3-Way Split: 80% Train, 10% Validation, 10% Test
@@ -201,7 +207,7 @@ def train_model():
     # This measures "how wrong" the model's predictions are.
     # Example: if the model predicts Fibrosis=0.7 but the real answer is 0.5,
     #   the error for that one value = (0.7 - 0.5)² = 0.04
-    # MSE averages this across all 4 scores and all images in the batch.
+    # MSE averages this across all 3 scores and all images in the batch.
     # Lower MSE = better predictions.
     criterion = nn.MSELoss()
 
@@ -230,7 +236,7 @@ def train_model():
     # Initialize Weights & Biases (W&B) for live cloud metric tracking
     wandb.init(
         project="ap-pancreatitis-scoring",
-        name="resnet18-transfer-aug",
+        name="resnet18-dropout-run2",
         config={
             "architecture": "ResNet18",
             "learning_rate": LEARNING_RATE,
