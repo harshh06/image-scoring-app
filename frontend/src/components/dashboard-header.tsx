@@ -16,17 +16,22 @@ export interface ExportDataItem {
 }
 
 export type TabType = "upload" | "history";
+export type ScoringMode = "ap" | "cp";
 
 interface DashboardHeaderProps {
   exportData: ExportDataItem[];
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
+  scoringMode: ScoringMode;
+  onScoringModeChange: (mode: ScoringMode) => void;
 }
 
 export function DashboardHeader({
   exportData,
   activeTab,
   onTabChange,
+  scoringMode,
+  onScoringModeChange,
 }: DashboardHeaderProps) {
   const handleExport = () => {
     if (exportData.length === 0) return;
@@ -79,7 +84,7 @@ export function DashboardHeader({
   return (
     <header className="border-b border-border bg-card">
       <div className="flex h-16 items-center justify-between px-6 lg:px-8">
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-8">
           {/* Logo and Title */}
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
@@ -92,8 +97,40 @@ export function DashboardHeader({
             </div>
           </div>
 
+          {/* AP / CP Scoring Mode Toggle */}
+          <div className="flex items-center gap-2 ml-6">
+            <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Mode</span>
+            <div className="flex items-center rounded-full border border-border bg-muted p-0.5 gap-0.5">
+              <button
+                onClick={() => onScoringModeChange("ap")}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition-all duration-200 ${
+                  scoringMode === "ap"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                AP
+              </button>
+              <button
+                onClick={() => onScoringModeChange("cp")}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition-all duration-200 ${
+                  scoringMode === "cp"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                CP
+              </button>
+            </div>
+            <span className={`text-xs font-medium w-40 ${
+              scoringMode === "ap" ? "text-blue-500" : "text-purple-500"
+            }`}>
+              {scoringMode === "ap" ? "Acute Pancreatitis" : "Chronic Pancreatitis"}
+            </span>
+          </div>
+
           {/* Tab Navigation */}
-          <nav className="flex items-center gap-1 ml-8">
+          <nav className="flex items-center gap-1 ml-6">
             <Button
               variant={activeTab === "upload" ? "default" : "ghost"}
               size="sm"

@@ -15,17 +15,26 @@ import logging
 logger = logging.getLogger(__name__)
 
 # --- CONFIGURATION ---
-# Must match training script exactly
-NUM_CLASSES = 4
-MAX_SCORES = np.array([4.0, 3.0, 3.0, 4.0], dtype=np.float32)
-MAX_FILE_SIZE = 100 * 1024 * 1024
-
-SCORE_FIELDS = {
+# CP Configurations
+CP_NUM_CLASSES = 4
+CP_MAX_SCORES = np.array([4.0, 3.0, 3.0, 4.0], dtype=np.float32)
+CP_SCORE_FIELDS = {
     "Pancreatic Architecture": "score_architecture",
     "Glandular Atrophy": "score_atrophy",
     "Pseudotubular Complexes": "score_complexes",
     "Fibrosis": "score_fibrosis"
 }
+
+# AP Configurations
+AP_NUM_CLASSES = 3
+AP_MAX_SCORES = np.array([4.0, 4.0, 4.0], dtype=np.float32)
+AP_SCORE_FIELDS = {
+    "Edema": "score_edema",
+    "Necrosis": "score_necrosis",
+    "Inflammation": "score_inflammation"
+}
+
+MAX_FILE_SIZE = 100 * 1024 * 1024
 
 # Standard transforms (same as training)
 MODEL_TRANSFORMS = transforms.Compose([
@@ -35,14 +44,24 @@ MODEL_TRANSFORMS = transforms.Compose([
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
 
-def get_model():
-    """Reconstructs the model architecture."""
-    model = models.resnet18(weights=None) # Weights will be loaded later
+def get_model_cp():
+    """Reconstructs the CP model architecture."""
+    model = models.resnet18(weights=None)
     num_ftrs = model.fc.in_features
-    model.fc = nn.Linear(num_ftrs, NUM_CLASSES)
+    model.fc = nn.Linear(num_ftrs, CP_NUM_CLASSES)
     return model
 
-def predict_scores(image: Image.Image, model: nn.Module) -> Dict[str, float]:
+def get_model_ap():
+    """Reconstructs the AP model architecture."""
+    model = models.resnet18(weights=None)
+    num_ftrs = model.fc.in_features
+    model.fc = nn.Sequential(
+        nn.Dropout(p=0.5),
+        nn.Linear(num_ftrs, AP_NUM_CLASSES)
+    )
+    return model
+
+def predict_scores(image: Image.Image, model: nn.Module, mode: str = "cp") -> Dict[str, float]:
     """Inference Logic."""
     
     # 1. Force Resize to 512x512 (Match Training Preprocessing)
@@ -63,20 +82,28 @@ def predict_scores(image: Image.Image, model: nn.Module) -> Dict[str, float]:
     normalized_scores = output.cpu().numpy().flatten()
     
     # Scale back to real range (e.g. 0-4)
-    actual_scores = normalized_scores * MAX_SCORES
+    max_scores = AP_MAX_SCORES if mode == "ap" else CP_MAX_SCORES
+    actual_scores = normalized_scores * max_scores
     
     # Clamp to be safe (no negatives or huge numbers)
-    actual_scores = np.clip(actual_scores, 0, MAX_SCORES)
+    actual_scores = np.clip(actual_scores, 0, max_scores)
     
     def round_quarter(num):
         return round(num * 4) / 4
 
-    scores = {
-        "Pancreatic Architecture": round_quarter(float(actual_scores[0])),
-        "Glandular Atrophy": round_quarter(float(actual_scores[1])),
-        "Pseudotubular Complexes": round_quarter(float(actual_scores[2])),
-        "Fibrosis": round_quarter(float(actual_scores[3])),
-    }
+    if mode == "ap":
+        scores = {
+            "Edema": round_quarter(float(actual_scores[0])),
+            "Necrosis": round_quarter(float(actual_scores[1])),
+            "Inflammation": round_quarter(float(actual_scores[2])),
+        }
+    else:
+        scores = {
+            "Pancreatic Architecture": round_quarter(float(actual_scores[0])),
+            "Glandular Atrophy": round_quarter(float(actual_scores[1])),
+            "Pseudotubular Complexes": round_quarter(float(actual_scores[2])),
+            "Fibrosis": round_quarter(float(actual_scores[3])),
+        }
     scores['Total'] = round(sum(scores.values()), 2)
     
     return scores
@@ -85,7 +112,7 @@ def extract_and_process_image(
     file_stream: bytes,          
     filename: str,             
     model: nn.Module, 
-    max_scores: np.ndarray
+    mode: str = "cp"
 ) -> Dict[str, Any]:
     """Main pipeline - In-Memory Version"""
     
@@ -99,7 +126,7 @@ def extract_and_process_image(
                 img = img.convert('RGB')
             
             # Predict scores
-            scores = predict_scores(img, model)
+            scores = predict_scores(img, model, mode=mode)
             
             return {
                 "status": "success",

@@ -32,3 +32,29 @@ class ImageScore(Base):
 
     def __repr__(self):
         return f"<ImageScore(id={self.id}, serial='{self.serial_number}', total={self.score_total})>"
+
+class APImageScore(Base):
+    __tablename__ = "ap_image_scores"
+
+    # Primary Key
+    id = Column(Integer, primary_key=True, index=True)
+
+    # File Metadata
+    filename =  Column(String, unique=True, nullable=False, index=True)      # e.g., "S-3602-10X_Image001.tif"
+    serial_number = Column(String, index=True) # e.g., "S-3602-01" (Unique ID)
+    sample_id = Column(String, index=True)     # e.g., "S-3602"    (Group ID)
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+
+    # The 3 Specific AP Pathology Scores
+    score_edema = Column(Float)
+    score_necrosis = Column(Float)
+    score_inflammation = Column(Float)
+    
+    # Total Score
+    score_total: Mapped[float] = mapped_column(Float)
+
+    def __repr__(self):
+        return f"<APImageScore(id={self.id}, serial='{self.serial_number}', total={self.score_total})>"

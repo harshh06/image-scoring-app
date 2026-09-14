@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 // Import the API service functions
 import { uploadImage, ProcessedResult, HistoryItem, GroupedHistory, fetchHistory, groupAndSortHistory } from "@/services/api";
 // Import components
-import { DashboardHeader, TabType } from "@/components/dashboard-header";
+import { DashboardHeader, TabType, ScoringMode } from "@/components/dashboard-header";
 import { FileDropzone } from "@/components/file-dropzone";
 import { FileStatusList } from "@/components/file-status-list";
 import { ImagePreviewSidebar } from "@/components/image-preview-sidebar";
@@ -29,8 +29,8 @@ export default function DashboardPage() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [scoreUpdating, setScoreUpdating] = useState<boolean>(false);
 
-  // Tab management
   const [activeTab, setActiveTab] = useState<TabType>("upload");
+  const [scoringMode, setScoringMode] = useState<ScoringMode>("ap");
 
   // History state
   const [selectedHistoryItem, setSelectedHistoryItem] =
@@ -132,7 +132,7 @@ export default function DashboardPage() {
 
     try {
       // --- B. API Call: This is the critical, time-consuming step ---
-      const result = await uploadImage(item.file);
+      const result = await uploadImage(item.file, scoringMode);
 
       // --- C. Success: Release Lock & Update Queue ---
       setQueue((prev) => {
@@ -182,11 +182,18 @@ export default function DashboardPage() {
       const scores = newQueue[index].result!.scores;
       // @ts-ignore
       scores[metric] = value;
-      scores.Total =
-        scores["Pancreatic Architecture"] +
-        scores["Glandular Atrophy"] +
-        scores["Pseudotubular Complexes"] +
-        scores["Fibrosis"];
+      if (scoringMode === "ap") {
+        scores.Total =
+          (scores.Edema || 0) +
+          (scores.Necrosis || 0) +
+          (scores.Inflammation || 0);
+      } else {
+        scores.Total =
+          (scores["Pancreatic Architecture"] || 0) +
+          (scores["Glandular Atrophy"] || 0) +
+          (scores["Pseudotubular Complexes"] || 0) +
+          (scores["Fibrosis"] || 0);
+      }
       scores.Total = Math.round(scores.Total * 100) / 100;
 
       return newQueue;
@@ -203,7 +210,7 @@ export default function DashboardPage() {
 
       setScoreUpdating(true);
 
-      await axios.put(`${API_URL}/api/scores/${item.result.db_id}`, {
+      await axios.put(`${API_URL}/api/scores/${item.result.db_id}?mode=${scoringMode}`, {
         [metric]: value,
       });
       console.log(`Saved ${metric} update to DB`);
@@ -228,7 +235,11 @@ export default function DashboardPage() {
     const updatedItem = { ...selectedHistoryItem };
     
     // Map metric names to database fields
-    const metricToField: { [key: string]: keyof HistoryItem } = {
+    const metricToField: { [key: string]: keyof HistoryItem } = scoringMode === "ap" ? {
+      "Edema": "score_edema",
+      "Necrosis": "score_necrosis",
+      "Inflammation": "score_inflammation",
+    } : {
       "Pancreatic Architecture": "score_architecture",
       "Glandular Atrophy": "score_atrophy",
       "Pseudotubular Complexes": "score_complexes",
@@ -240,11 +251,18 @@ export default function DashboardPage() {
       // @ts-ignore - we know these are number fields
       updatedItem[field] = value;
       // Recalculate total
-      updatedItem.score_total =
-        (updatedItem.score_architecture ?? 0) +
-        (updatedItem.score_atrophy ?? 0) +
-        (updatedItem.score_complexes ?? 0) +
-        (updatedItem.score_fibrosis ?? 0);
+      if (scoringMode === "ap") {
+        updatedItem.score_total =
+          (updatedItem.score_edema ?? 0) +
+          (updatedItem.score_necrosis ?? 0) +
+          (updatedItem.score_inflammation ?? 0);
+      } else {
+        updatedItem.score_total =
+          (updatedItem.score_architecture ?? 0) +
+          (updatedItem.score_atrophy ?? 0) +
+          (updatedItem.score_complexes ?? 0) +
+          (updatedItem.score_fibrosis ?? 0);
+      }
       updatedItem.score_total =
         Math.round(updatedItem.score_total * 100) / 100;
     }
@@ -258,7 +276,7 @@ export default function DashboardPage() {
 
       setHistoryScoreUpdating(true);
 
-      await axios.put(`${API_URL}/api/scores/${itemId}`, {
+      await axios.put(`${API_URL}/api/scores/${itemId}?mode=${scoringMode}`, {
         [metric]: value,
       });
       console.log(`Saved ${metric} update for history item ${itemId} to DB`);
@@ -280,7 +298,7 @@ export default function DashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchHistory();
+      const data = await fetchHistory(scoringMode);
       const grouped = groupAndSortHistory(data);
       setGroupedHistory(grouped);
       // Expand all groups by default
@@ -306,7 +324,7 @@ export default function DashboardPage() {
     return () => clearTimeout(timer); // Cleanup timer if component unmounts
   }, [queue, isProcessing, processQueue]);
 
-  // Clear selection and reset state when switching tabs
+  // Clear selection and reset state when switching tabs or modes
   useEffect(() => {
     if (activeTab === "upload") {
       setSelectedHistoryItem(null);
@@ -318,7 +336,7 @@ export default function DashboardPage() {
       // Clear selected groups when switching to history (start fresh)
       setSelectedGroups(new Set());
     }
-  }, [activeTab]);
+  }, [activeTab, scoringMode]);
 
   return (
     <div className="flex h-screen flex-col bg-background">
@@ -327,6 +345,8 @@ export default function DashboardPage() {
         exportData={exportData}
         activeTab={activeTab}
         onTabChange={setActiveTab}
+        scoringMode={scoringMode}
+        onScoringModeChange={setScoringMode}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -378,6 +398,7 @@ export default function DashboardPage() {
         ) : (
           <HistoryPreviewSidebar
             selectedItem={selectedHistoryItem}
+            scoringMode={scoringMode}
             onScoreUpdate={handleHistoryScoreUpdate}
             scoreUpdating={historyScoreUpdating}
           />

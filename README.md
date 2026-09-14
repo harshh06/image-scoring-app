@@ -63,10 +63,13 @@ Pathologists manually score tissue samples across multiple metrics (fibrosis, at
 
 ## 🚀 Key Features
 
-### 🤖 Automated AI Inference
-- **ResNet18-based CNN** fine-tuned on annotated pancreatic tissue samples
+### 🤖 Dual-Scoring AI Inference
+- **ResNet18-based CNNs** fine-tuned on annotated pancreatic tissue samples
+- **Dual-Model Support**: Seamlessly switch between Chronic Pancreatitis (CP) and Acute Pancreatitis (AP) scoring modes from the frontend dashboard.
 - Processes high-resolution `.tif` / `.tiff` whole-slide images (50+ MB each)
-- Predicts 4 pathology metrics: *Architecture, Atrophy, Complexes, Fibrosis*
+- Predicts pathology metrics dynamically based on the active mode:
+  - **CP Mode**: *Architecture, Atrophy, Complexes, Fibrosis*
+  - **AP Mode**: *Edema, Necrosis, Inflammation*
 - **Average inference time:** ~2 seconds per image on CPU
 
 ### 🔄 Client-Side Sequential Queue
@@ -285,51 +288,45 @@ docker compose logs backend | grep "PIL"
 
 ---
 
-## 🧠 Model Details
-
 ## 🧠 Model Architecture & Training Details
 
 ### Core Architecture
 
-The core of this system is a **ResNet18 Convolutional Neural Network**, adapted for medical regression through transfer learning.
+The core of this system utilizes **ResNet18 Convolutional Neural Networks**, adapted for medical regression through transfer learning.
 
 **Base Model:** ResNet18 pretrained on ImageNet (chosen for the optimal balance between feature extraction depth and CPU inference speed).
 
-**Custom Regression Head:** The standard 1000-class classification head was replaced with a 4-output linear layer to predict continuous pathology scores.
+**Custom Regression Head:** The standard 1000-class classification head was replaced with custom linear layers to predict continuous pathology scores.
 
 ---
 
-### Fine-Tuning Strategy (Partial Unfreezing)
+### 🟢 Model 1: Acute Pancreatitis (AP) Scoring (Enhanced)
 
-#### Frozen Layers
-Layers 1–3 were frozen to preserve general vision features (edges, textures) learned from ImageNet.
+- **Architecture:** ResNet18 (pretrained ImageNet) + dropout (`p=0.5`) before regression head.
+- **Data Augmentation:** random horizontal/vertical flips, 45° rotation, color jitter (brightness 0.1, contrast 0.1).
+- **Regularization:** Dropout layer, early stopping via validation loss.
+- **Training Config:** Adam optimizer (`lr=0.0001`), batch size `8`, `35` epochs on Apple Silicon MPS.
+- **Metrics:** Best validation MSE ≈ 0.028, final test MSE ≈ 0.023.
+- **Experiment Tracking:** [View W&B Interactive Training Report](https://wandb.ai/harshsoni/ap-pancreatitis-scoring/reports/ResNet-18-AP-Tissue-Scoring-Training-Metrics--VmlldzoxNzkzMjc3Ng?accessToken=o5jhhbmggxtr24mxghip4s5qg30mg9avhfp6m81ejthdv6als72eouppispi6j71)
 
-#### Unfrozen Layers
-Layer 4 and the Custom Head were unfrozen for domain-specific fine-tuning, allowing the model to adapt to complex histological patterns like pancreatic fibrosis.
-
----
-
-### Training Dataset & Preprocessing
-
-**Dataset:** Approximately 400–500 expert-annotated pancreatic H&E stained tissue crops.
-
-**Data Normalization:** Implemented **Target Scaling**, normalizing expert scores (0–4) to a 0.0–1.0 range during training to stabilize gradients and accelerate convergence.
+![AP Training Loss Curve](loss_curves.png)
 
 ---
 
-### Optimization Configuration
+### 🔵 Model 2: Chronic Pancreatitis (CP) Scoring (Legacy)
 
-| Parameter | Value |
-|-----------|-------|
-| **Loss Function** | Mean Squared Error (MSE) |
-| **Optimizer** | Adam (lr=0.001) |
-| **Training Environment** | Apple M2 MacBook Air |
-| **Epochs** | ~50 (with early stopping) |
-| **Batch Size** | 16 |
+Our original CP model was also trained on ~400-500 expert-annotated pancreatic H&E stained tissue crops, establishing the baseline pipeline.
 
-**Loss Function Rationale:** MSE was chosen to minimize the distance between predicted and ground-truth severity scores, treating each pathology metric as a continuous regression target.
+#### Fine-Tuning Strategy (Partial Unfreezing)
+- **Frozen Layers:** Layers 1–3 were frozen to preserve general vision features (edges, textures) learned from ImageNet.
+- **Unfrozen Layers:** Layer 4 and the Custom Head were unfrozen for domain-specific fine-tuning, allowing the model to adapt to complex histological patterns like pancreatic fibrosis.
 
-**Optimizer Rationale:** Adam utilizes adaptive learning rates, which is particularly effective for efficient training on small datasets.
+#### Data Normalization
+Implemented **Target Scaling**, normalizing expert scores (0–4) to a 0.0–1.0 range during training to stabilize gradients and accelerate convergence.
+
+#### CP Model Performance Metrics
+- **Configuration:** Adam Optimizer (`lr=0.001`), Batch Size `16`, `~50` Epochs (with early stopping).
+- **Loss Function:** Mean Squared Error (MSE), chosen to minimize the distance between predicted and ground-truth severity scores, treating each pathology metric as a continuous regression target.
 
 ---
 

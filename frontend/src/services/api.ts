@@ -7,12 +7,15 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // --- TYPE DEFINITIONS (Matching your FastAPI output) ---
 
-// Defines the shape of the four scores and the total
+// Defines the shape of the scores
 export interface ScoreData {
-  "Pancreatic Architecture": number;
-  "Glandular Atrophy": number;
-  "Pseudotubular Complexes": number;
-  Fibrosis: number;
+  "Pancreatic Architecture"?: number;
+  "Glandular Atrophy"?: number;
+  "Pseudotubular Complexes"?: number;
+  Fibrosis?: number;
+  Edema?: number;
+  Necrosis?: number;
+  Inflammation?: number;
   Total: number;
 }
 
@@ -35,10 +38,13 @@ export interface HistoryItem {
   sample_id: string;
   created_at: string;
   updated_at: string;
-  score_architecture: number;
-  score_atrophy: number;
-  score_complexes: number;
-  score_fibrosis: number;
+  score_architecture?: number;
+  score_atrophy?: number;
+  score_complexes?: number;
+  score_fibrosis?: number;
+  score_edema?: number;
+  score_necrosis?: number;
+  score_inflammation?: number;
   score_total: number;
 }
 
@@ -54,15 +60,15 @@ export interface GroupedHistory {
  * @param file The File object selected by the user.
  * @returns A Promise resolving to the ProcessedResult (scores, thumbnail URL).
  */
-export const uploadImage = async (file: File): Promise<ProcessedResult> => {
+export const uploadImage = async (file: File, mode: string = "cp"): Promise<ProcessedResult> => {
   // Use FormData to send the file correctly as 'multipart/form-data'
   const formData = new FormData();
   formData.append("file", file);
 
-  console.log(`[API] Starting upload for: ${file.name}: ${API_URL}`);
+  console.log(`[API] Starting upload for: ${file.name} in mode: ${mode}`);
 
   // We use Axios to handle the POST request
-  const response = await axios.post(`${API_URL}/api/upload-image/`, formData, {
+  const response = await axios.post(`${API_URL}/api/upload-image?mode=${mode}`, formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -75,10 +81,10 @@ export const uploadImage = async (file: File): Promise<ProcessedResult> => {
  * Fetches all previously scored images from the database.
  * @returns A Promise resolving to an array of HistoryItem objects.
  */
-export const fetchHistory = async (): Promise<HistoryItem[]> => {
-  console.log(`[API] Fetching history from: ${API_URL}`);
+export const fetchHistory = async (mode: string = "cp"): Promise<HistoryItem[]> => {
+  console.log(`[API] Fetching history from: ${API_URL} in mode: ${mode}`);
   
-  const response = await axios.get(`${API_URL}/api/scores`);
+  const response = await axios.get(`${API_URL}/api/scores?mode=${mode}`);
   return response.data;
 };
 
@@ -90,16 +96,12 @@ export const fetchHistory = async (): Promise<HistoryItem[]> => {
  */
 export const updateScore = async (
   id: number,
-  updates: Partial<{
-    "Pancreatic Architecture": number;
-    "Glandular Atrophy": number;
-    "Pseudotubular Complexes": number;
-    Fibrosis: number;
-  }>
+  updates: Partial<ScoreData>,
+  mode: string = "cp"
 ): Promise<HistoryItem> => {
-  console.log(`[API] Updating score ${id}:`, updates);
+  console.log(`[API] Updating score ${id} in mode ${mode}:`, updates);
   
-  const response = await axios.put(`${API_URL}/api/scores/${id}`, updates);
+  const response = await axios.put(`${API_URL}/api/scores/${id}?mode=${mode}`, updates);
   return response.data;
 };
 
