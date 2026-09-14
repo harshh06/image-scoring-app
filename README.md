@@ -138,6 +138,73 @@ Unified trailing-slash handling across frontend/backend prevents 307 redirect lo
 
 ---
 
+## 🧠 Model Architecture & Training Details
+
+### Core Architecture
+
+The core of this system utilizes **ResNet18 Convolutional Neural Networks**, adapted for medical regression through transfer learning.
+
+**Base Model:** ResNet18 pretrained on ImageNet (chosen for the optimal balance between feature extraction depth and CPU inference speed).
+
+**Custom Regression Head:** The standard 1000-class classification head was replaced with custom linear layers to predict continuous pathology scores.
+
+---
+
+### 🟢 Model 1: Acute Pancreatitis (AP) Scoring (Enhanced)
+
+- **Architecture:** ResNet18 (pretrained ImageNet) + dropout (`p=0.5`) before regression head.
+- **Data Augmentation:** random horizontal/vertical flips, 45° rotation, color jitter (brightness 0.1, contrast 0.1).
+- **Regularization:** Dropout layer, early stopping via validation loss.
+- **Training Config:** Adam optimizer (`lr=0.0001`), batch size `8`, `35` epochs on Apple Silicon MPS.
+- **Metrics:** Best validation MSE ≈ 0.028, final test MSE ≈ 0.023.
+- **Experiment Tracking:** [View W&B Interactive Training Report](https://wandb.ai/harshsoni/ap-pancreatitis-scoring/reports/ResNet-18-AP-Tissue-Scoring-Training-Metrics--VmlldzoxNzkzMjc3Ng?accessToken=o5jhhbmggxtr24mxghip4s5qg30mg9avhfp6m81ejthdv6als72eouppispi6j71)
+
+![AP Training Loss Curve](loss_curves.png)
+
+---
+
+### 🔵 Model 2: Chronic Pancreatitis (CP) Scoring (Legacy)
+
+Our original CP model was also trained on ~400-500 expert-annotated pancreatic H&E stained tissue crops, establishing the baseline pipeline.
+
+#### Fine-Tuning Strategy (Partial Unfreezing)
+- **Frozen Layers:** Layers 1–3 were frozen to preserve general vision features (edges, textures) learned from ImageNet.
+- **Unfrozen Layers:** Layer 4 and the Custom Head were unfrozen for domain-specific fine-tuning, allowing the model to adapt to complex histological patterns like pancreatic fibrosis.
+
+#### Data Normalization
+Implemented **Target Scaling**, normalizing expert scores (0–4) to a 0.0–1.0 range during training to stabilize gradients and accelerate convergence.
+
+#### CP Model Performance Metrics
+- **Configuration:** Adam Optimizer (`lr=0.001`), Batch Size `16`, `~50` Epochs (with early stopping).
+- **Loss Function:** Mean Squared Error (MSE), chosen to minimize the distance between predicted and ground-truth severity scores, treating each pathology metric as a continuous regression target.
+
+---
+
+### Why ResNet18?
+
+#### 1. Anti-Overfitting
+Deeper architectures (ResNet50/152) contain significantly more parameters, which pose a high risk of **"memorizing" rather than "learning"** from a 400-sample dataset.
+
+#### 2. Production Latency
+ResNet18 maintains a small memory footprint (~45MB–62MB), allowing for **~2s inference times on CPU-only environments** like Hugging Face Spaces.
+
+#### 3. Stateless Inference
+By using a lighter model, the system can process images directly in RAM, avoiding the need for expensive GPU clusters or persistent disk storage for temporary files.
+
+---
+
+### Performance Characteristics
+
+| Metric | Value |
+|--------|-------|
+| **Model Size** | ~62 MB (Optimized for Git LFS/Deployment) |
+| **Backbone** | ResNet18 (Transfer Learning) |
+| **Inference Time** | ~2.3 seconds per image (CPU) |
+| **Batch Logic** | Sequential FIFO Queue (prevents RAM spikes) |
+| **Persistence** | Database "Upsert" logic (preserves manual overrides) |
+
+---
+
 ## 📂 Project Structure
 
 ```
@@ -286,75 +353,7 @@ ls -lh backend/pancreas_model.pth
 docker compose logs backend | grep "PIL"
 ```
 
----
 
-## 🧠 Model Architecture & Training Details
-
-### Core Architecture
-
-The core of this system utilizes **ResNet18 Convolutional Neural Networks**, adapted for medical regression through transfer learning.
-
-**Base Model:** ResNet18 pretrained on ImageNet (chosen for the optimal balance between feature extraction depth and CPU inference speed).
-
-**Custom Regression Head:** The standard 1000-class classification head was replaced with custom linear layers to predict continuous pathology scores.
-
----
-
-### 🟢 Model 1: Acute Pancreatitis (AP) Scoring (Enhanced)
-
-- **Architecture:** ResNet18 (pretrained ImageNet) + dropout (`p=0.5`) before regression head.
-- **Data Augmentation:** random horizontal/vertical flips, 45° rotation, color jitter (brightness 0.1, contrast 0.1).
-- **Regularization:** Dropout layer, early stopping via validation loss.
-- **Training Config:** Adam optimizer (`lr=0.0001`), batch size `8`, `35` epochs on Apple Silicon MPS.
-- **Metrics:** Best validation MSE ≈ 0.028, final test MSE ≈ 0.023.
-- **Experiment Tracking:** [View W&B Interactive Training Report](https://wandb.ai/harshsoni/ap-pancreatitis-scoring/reports/ResNet-18-AP-Tissue-Scoring-Training-Metrics--VmlldzoxNzkzMjc3Ng?accessToken=o5jhhbmggxtr24mxghip4s5qg30mg9avhfp6m81ejthdv6als72eouppispi6j71)
-
-![AP Training Loss Curve](loss_curves.png)
-
----
-
-### 🔵 Model 2: Chronic Pancreatitis (CP) Scoring (Legacy)
-
-Our original CP model was also trained on ~400-500 expert-annotated pancreatic H&E stained tissue crops, establishing the baseline pipeline.
-
-#### Fine-Tuning Strategy (Partial Unfreezing)
-- **Frozen Layers:** Layers 1–3 were frozen to preserve general vision features (edges, textures) learned from ImageNet.
-- **Unfrozen Layers:** Layer 4 and the Custom Head were unfrozen for domain-specific fine-tuning, allowing the model to adapt to complex histological patterns like pancreatic fibrosis.
-
-#### Data Normalization
-Implemented **Target Scaling**, normalizing expert scores (0–4) to a 0.0–1.0 range during training to stabilize gradients and accelerate convergence.
-
-#### CP Model Performance Metrics
-- **Configuration:** Adam Optimizer (`lr=0.001`), Batch Size `16`, `~50` Epochs (with early stopping).
-- **Loss Function:** Mean Squared Error (MSE), chosen to minimize the distance between predicted and ground-truth severity scores, treating each pathology metric as a continuous regression target.
-
----
-
-### Why ResNet18?
-
-#### 1. Anti-Overfitting
-Deeper architectures (ResNet50/152) contain significantly more parameters, which pose a high risk of **"memorizing" rather than "learning"** from a 400-sample dataset.
-
-#### 2. Production Latency
-ResNet18 maintains a small memory footprint (~45MB–62MB), allowing for **~2s inference times on CPU-only environments** like Hugging Face Spaces.
-
-#### 3. Stateless Inference
-By using a lighter model, the system can process images directly in RAM, avoiding the need for expensive GPU clusters or persistent disk storage for temporary files.
-
----
-
-### Performance Characteristics
-
-| Metric | Value |
-|--------|-------|
-| **Model Size** | ~62 MB (Optimized for Git LFS/Deployment) |
-| **Backbone** | ResNet18 (Transfer Learning) |
-| **Inference Time** | ~2.3 seconds per image (CPU) |
-| **Batch Logic** | Sequential FIFO Queue (prevents RAM spikes) |
-| **Persistence** | Database "Upsert" logic (preserves manual overrides) |
-
-
----
 
 ## 🚀 Deployment
 
