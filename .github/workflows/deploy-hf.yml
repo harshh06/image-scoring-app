@@ -1,0 +1,42 @@
+name: Deploy Backend to Hugging Face Spaces
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-hf.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GitHub Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push Backend to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions Bot"
+          
+          # Clone the Hugging Face Space repository
+          git clone https://harshsonii:$HF_TOKEN@huggingface.co/spaces/harshsonii/histopathology-scoring hf_space
+          
+          # Copy updated backend code into the HF Space folder (excluding local databases and env files)
+          rsync -av --exclude='*.pth' --exclude='sql_app.db' --exclude='.env' backend/ hf_space/
+          
+          cd hf_space
+          git add .
+          
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No backend changes to deploy."
+          else
+            git commit -m "Auto-deploy backend update from GitHub commit ${{ github.sha }}"
+            git push https://harshsonii:$HF_TOKEN@huggingface.co/spaces/harshsonii/histopathology-scoring main
+          fi
