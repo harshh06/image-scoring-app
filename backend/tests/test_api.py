@@ -55,20 +55,33 @@ class TestUploadImage:
         assert record is not None
         assert record.filename == "S-1234-10X_Image001.tif"
     
-    def test_upload_non_tiff_rejected(self, client_with_model):
-        """Should reject non-TIFF files."""
-        # Create a JPG file
-        img = Image.new('RGB', (100, 100))
-        buffer = BytesIO()
-        img.save(buffer, format='JPEG')
-        buffer.seek(0)
-        buffer.name = "test.jpg"
+    def test_upload_unsupported_format_rejected(self, client_with_model):
+        """Should reject unsupported file types (not .tif/.tiff/.jpg/.jpeg)."""
+        buffer = BytesIO(b"not an image")
+        buffer.name = "test.txt"
         
-        files = {"file": ("test.jpg", buffer, "image/jpeg")}
+        files = {"file": ("test.txt", buffer, "text/plain")}
         response = client_with_model.post("/api/upload-image/", files=files)
         
         assert response.status_code == 400
-        assert "Only .tif files supported" in response.json()["detail"]
+        assert "Only .tif and .jpg files supported" in response.json()["detail"]
+    
+    def test_upload_valid_jpg(self, client_with_model, test_db):
+        """Should accept and process valid JPG file."""
+        img = Image.new('RGB', (224, 224), color='blue')
+        buffer = BytesIO()
+        img.save(buffer, format='JPEG')
+        buffer.seek(0)
+        buffer.name = "S-1234-10X_Image001.jpg"
+        
+        files = {"file": ("S-1234-10X_Image001.jpg", buffer, "image/jpeg")}
+        response = client_with_model.post("/api/upload-image/", files=files)
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert "scores" in data
+        assert "display_url" in data
     
     def test_upload_duplicate_file_returns_cached(self, client_with_model, test_db):
         """Re-uploading same file should return DB record without re-inference."""

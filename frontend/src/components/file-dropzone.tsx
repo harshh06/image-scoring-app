@@ -46,7 +46,7 @@ export function FileDropzone({ onFilesAccepted, disabled }: FileDropzoneProps) {
         </div>
         <div className="text-center">
           <h3 className="text-xl font-semibold text-foreground">
-            {disabled ? "Processing Queue..." : "Drop your TIFF files here"}
+            {disabled ? "Processing Queue..." : "Drop your image files here"}
           </h3>
           <p className="mt-2 text-sm text-muted-foreground">
             or click to browse from your computer (Supports multiple files)
@@ -54,13 +54,13 @@ export function FileDropzone({ onFilesAccepted, disabled }: FileDropzoneProps) {
         </div>
         <div className=" bottom-2 p-2 left-2 left-0 right-0 text-center text-xs text-muted-foreground">
           <AlertTriangle className="inline h-3 w-3 mr-1 text-yellow-500" />
-          Only TIFF files are accepted and processed sequentially.
+          Only TIFF and JPG files are accepted and processed sequentially.
         </div>
 
         <input
           type="file"
           multiple
-          accept=".tif,.tiff" // CRITICAL: Only accept the required file types
+          accept=".tif,.tiff,.jpg,.jpeg" // CRITICAL: Only accept the required file types
           className="absolute inset-0 cursor-pointer opacity-0"
           onChange={handleFileChange}
           disabled={disabled}
