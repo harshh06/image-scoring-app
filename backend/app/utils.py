@@ -158,7 +158,14 @@ def generate_thumbnail_and_metadata(
     if len(parts) >= 2:
         sample_id = f"{parts[0]}-{parts[1]}"
 
-    match = re.search(r"Image(\d+)", filename, re.IGNORECASE)
+    # Pattern 1: "image" keyword followed by optional separator (_/-) then digits
+    # Handles: Image008, Image_04, image-13, image01
+    match = re.search(r"[Ii]mage[_\-]?(\d+)", filename)
+    if not match:
+        # Pattern 2: number after "10x"/"10X" section (e.g., S-4319-10X-01.tif)
+        stem = filename.rsplit('.', 1)[0]
+        match = re.search(r"10[xX][_\-]?(\d+)", stem)
+
     if match:
         raw_num = match.group(1)
         image_suffix = raw_num[-2:] if len(raw_num) >= 2 else raw_num.zfill(2)
