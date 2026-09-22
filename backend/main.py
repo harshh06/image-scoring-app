@@ -142,8 +142,8 @@ async def upload_image(
     safe_filename = file.filename or "unknown_file.tif"
 
     # 1. Validation - File type
-    if not safe_filename.lower().endswith(('.tif', '.tiff')):
-        raise HTTPException(400, "Only .tif files supported")
+    if not safe_filename.lower().endswith(('.tif', '.tiff', '.jpg', '.jpeg')):
+        raise HTTPException(400, "Only .tif and .jpg files supported")
     
     # 2. Validation - File size
     file.file.seek(0, 2)  # Seek to end

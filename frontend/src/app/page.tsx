@@ -89,14 +89,13 @@ export default function DashboardPage() {
     }
   }, [activeTab, results, selectedGroups, groupedHistory]);
 
+
   // --- 1. Handle File Selection: Add files to the queue ---
   const handleFileSelect = (fileList: FileList) => {
+    const allowedExtensions = [".tif", ".tiff", ".jpg", ".jpeg"];
     const newFiles = Array.from(fileList)
-      .filter(
-        (file) =>
-          // Filter only TIFF files as required by the backend
-          file.name.toLowerCase().endsWith(".tif") ||
-          file.name.toLowerCase().endsWith(".tiff")
+      .filter((file) =>
+        allowedExtensions.some((ext) => file.name.toLowerCase().endsWith(ext))
       )
       .map((file) => ({
         id: Math.random().toString(36).substring(2, 9), // Generate unique ID
