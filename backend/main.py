@@ -27,7 +27,8 @@ from app.utils import (
     generate_thumbnail_and_metadata, 
     MAX_FILE_SIZE, 
     CP_SCORE_FIELDS,
-    AP_SCORE_FIELDS
+    AP_SCORE_FIELDS,
+    parse_serial_number
 )
 
 CP_MODEL_PATH = Path("pancreas_model.pth")
@@ -354,6 +355,29 @@ async def update_score(
     db.refresh(record)
     
     return {"status": "updated", "new_total": record.score_total}
+
+@app.post("/api/migrate-serial-numbers")
+async def migrate_serial_numbers(db: Session = Depends(database.get_db)):
+    """One-time migration: re-derive serial_number from filename for all existing records."""
+    updated = 0
+    for db_model in [models.ImageScore, models.APImageScore]:
+        try:
+            records = db.query(db_model).all()
+            for record in records:
+                parsed = parse_serial_number(record.filename)
+                new_serial = parsed["serial_number"]
+                new_sample_id = parsed["sample_id"]
+                if record.serial_number != new_serial or record.sample_id != new_sample_id:
+                    record.serial_number = new_serial
+                    record.sample_id = new_sample_id
+                    updated += 1
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Migration failed for {db_model.__tablename__}: {e}", exc_info=True)
+            raise HTTPException(500, f"Migration failed: {e}")
+    
+    return {"status": "success", "records_updated": updated}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

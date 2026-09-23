@@ -14,6 +14,38 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
+def parse_serial_number(filename: str) -> Dict[str, str]:
+    """
+    Extract sample_id and serial_number from a filename.
+    Handles various naming conventions:
+      - S-3601-10x_Image008_RAW_ch00.tif  -> S-3601-08
+      - S-4314-10x-Image_04.tif           -> S-4314-04
+      - S-4319-10X-01.tif                 -> S-4319-01
+      - S-4318-10x-image-13.tif           -> S-4318-13
+      - S-4318-10Ximage01.tif             -> S-4318-01
+    """
+    sample_id = "UNKNOWN"
+    image_suffix = "00"
+
+    parts = filename.split("-")
+    if len(parts) >= 2:
+        sample_id = f"{parts[0]}-{parts[1]}"
+
+    # Pattern 1: "image" keyword followed by optional separator (_/-) then digits
+    match = re.search(r"[Ii]mage[_\-]?(\d+)", filename)
+    if not match:
+        # Pattern 2: number after "10x"/"10X" section (e.g., S-4319-10X-01.tif)
+        stem = filename.rsplit('.', 1)[0]
+        match = re.search(r"10[xX][_\-]?(\d+)", stem)
+
+    if match:
+        raw_num = match.group(1)
+        image_suffix = raw_num[-2:] if len(raw_num) >= 2 else raw_num.zfill(2)
+
+    full_serial = f"{sample_id}-{image_suffix}"
+    return {"sample_id": sample_id, "serial_number": full_serial}
+
 # --- CONFIGURATION ---
 # CP Configurations
 CP_NUM_CLASSES = 4
@@ -150,27 +182,10 @@ def generate_thumbnail_and_metadata(
     Extracts metadata from filename and generates Base64 thumbnail.
     Used for both new uploads and existing DB records.
     """
-    # --- PARSING LOGIC (Same as in extract_and_process_image) ---
-    sample_id = "UNKNOWN"
-    image_suffix = "00"
-    
-    parts = filename.split("-")
-    if len(parts) >= 2:
-        sample_id = f"{parts[0]}-{parts[1]}"
-
-    # Pattern 1: "image" keyword followed by optional separator (_/-) then digits
-    # Handles: Image008, Image_04, image-13, image01
-    match = re.search(r"[Ii]mage[_\-]?(\d+)", filename)
-    if not match:
-        # Pattern 2: number after "10x"/"10X" section (e.g., S-4319-10X-01.tif)
-        stem = filename.rsplit('.', 1)[0]
-        match = re.search(r"10[xX][_\-]?(\d+)", stem)
-
-    if match:
-        raw_num = match.group(1)
-        image_suffix = raw_num[-2:] if len(raw_num) >= 2 else raw_num.zfill(2)
-
-    full_serial = f"{sample_id}-{image_suffix}"
+    # --- PARSING LOGIC ---
+    parsed = parse_serial_number(filename)
+    sample_id = parsed["sample_id"]
+    full_serial = parsed["serial_number"]
 
     # --- THUMBNAIL GENERATION ---
     with Image.open(BytesIO(file_bytes)) as img:
